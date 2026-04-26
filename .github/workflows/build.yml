@@ -1,0 +1,167 @@
+name: Build Executables
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      create_release:
+        description: 'Create a release'
+        required: false
+        default: 'false'
+        type: boolean
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+        include:
+          - os: windows-latest
+            platform: windows
+            executable: Cloud Music Download.exe
+          - os: macos-latest
+            platform: macos
+            executable: Cloud Music Download.app
+          - os: ubuntu-latest
+            platform: linux
+            executable: Cloud Music Download
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pyinstaller
+        pip install -r requirements.txt
+
+    - name: Build executable (Windows)
+      if: matrix.platform == 'windows'
+      run: |
+        pyinstaller --clean "Cloud Music Download.spec"
+        mv dist/"Cloud Music Download.exe" .
+
+    - name: Build executable (macOS)
+      if: matrix.platform == 'macos'
+      run: |
+        pyinstaller --clean "Cloud Music Download.spec"
+        mv dist/"Cloud Music Download" .
+
+    - name: Build executable (Linux)
+      if: matrix.platform == 'linux'
+      run: |
+        pyinstaller --clean "Cloud Music Download.spec"
+        mv dist/"Cloud Music Download" .
+
+    - name: Create archive (Windows)
+      if: matrix.platform == 'windows'
+      run: |
+        7z a -tzip "Cloud-Music-Download-${{ matrix.platform }}.zip" "Cloud Music Download.exe" README.md config.json icon.ico
+
+    - name: Create archive (macOS)
+      if: matrix.platform == 'macos'
+      run: |
+        zip -r "Cloud-Music-Download-${{ matrix.platform }}.zip" "Cloud Music Download" README.md config.json icon.ico
+
+    - name: Create archive (Linux)
+      if: matrix.platform == 'linux'
+      run: |
+        tar -czf "Cloud-Music-Download-${{ matrix.platform }}.tar.gz" "Cloud Music Download" README.md config.json icon.ico
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.platform }}-build
+        path: |
+          Cloud-Music-Download-${{ matrix.platform }}.zip
+          Cloud-Music-Download-${{ matrix.platform }}.tar.gz
+        retention-days: 30
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.create_release == 'true'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download Windows artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: windows-build
+        path: ./artifacts
+
+    - name: Download macOS artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: macos-build
+        path: ./artifacts
+
+    - name: Download Linux artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: linux-build
+        path: ./artifacts
+
+    - name: Get version
+      id: get_version
+      run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ steps.get_version.outputs.VERSION }}
+        name: Cloud Music Download ${{ steps.get_version.outputs.VERSION }}
+        files: |
+          artifacts/Cloud-Music-Download-windows.zip
+          artifacts/Cloud-Music-Download-macos.zip
+          artifacts/Cloud-Music-Download-linux.tar.gz
+        body: |
+          # 🎵 Cloud Music Download ${{ steps.get_version.outputs.VERSION }}
+          
+          ## 📥 下载说明
+          
+          ### Windows 用户
+          1. 下载 `Cloud-Music-Download-windows.zip`
+          2. 解压文件
+          3. 运行 `Cloud Music Download.exe`
+          
+          ### macOS 用户
+          1. 下载 `Cloud-Music-Download-macos.zip`
+          2. 解压文件
+          3. 运行 `Cloud Music Download`
+          4. 如果提示"无法打开"，请在终端运行：`xattr -cr "Cloud Music Download"`
+          
+          ### Linux 用户
+          1. 下载 `Cloud-Music-Download-linux.tar.gz`
+          2. 解压文件：`tar -xzf Cloud-Music-Download-linux.tar.gz`
+          3. 添加执行权限：`chmod +x "Cloud Music Download"`
+          4. 运行：`./Cloud Music Download`
+          
+          ## ⚙️ 环境要求
+          
+          - **本地 API**: 需要 Node.js 14 或更高版本
+          - **云端 API**: 无需额外依赖
+          
+          ## 📖 使用文档
+          
+          详细使用说明请查看 [README.md](https://github.com/mobaixingyao/Cloud-Music-Download#readme)
+          
+          ## 🙏 致谢
+          
+          感谢所有贡献者和用户的支持！
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

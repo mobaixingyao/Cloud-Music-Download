@@ -6,6 +6,7 @@
 ![Python](https://img.shields.io/badge/python-3.8+-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-orange.svg)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)
+![Build](https://github.com/mobaixingyao/Cloud-Music-Download/workflows/Build%20Executables/badge.svg)
 
 **一款基于 Python 开发的网易云音乐下载工具，支持无损音质下载**
 

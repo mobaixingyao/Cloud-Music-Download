@@ -1,5 +1,6 @@
 .userdata
 .downloads
+downloads/
 node/
 nodejs12/
 __pycache__/
@@ -18,3 +19,5 @@ Thumbs.db
 .idea/
 .vscode/
 *.log
+*.mp3
+*.flac
