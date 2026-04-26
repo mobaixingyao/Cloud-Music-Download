@@ -181,58 +181,11 @@ MoMusic/
 
 ***
 
-## 🎯 开发计划
-
-- [ ] 支持更多音质选项
-- [ ] 添加歌词下载功能
-- [ ] 支持专辑封面下载
-- [ ] 添加播放列表管理
-- [ ] 支持批量下载歌手所有歌曲
-- [ ] 添加下载历史记录
-- [ ] 支持代理设置
-- [ ] 多语言支持
-
-***
-
-## 🤝 贡献指南
-
-欢迎贡献代码、报告问题或提出建议！
-
-1. Fork 本仓库
-2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 提交 Pull Request
-
-***
-
-## 📝 许可证
-
-本项目采用 MIT 许可证 - 详见 [LICENSE](LICENSE) 文件
-
-***
-
 ## ⚠️ 免责声明
 
 - 本软件仅供学习交流使用
 - 请勿用于商业用途
 - 使用本软件造成的一切后果由用户自行承担
-- 请尊重版权，支持正版音乐
-
-***
-
-## 🙏 致谢
-
-- [NeteaseCloudMusicApiEnhanced](https://github.com/NeteaseCloudMusicApiEnhanced/api-enhanced) - 提供网易云音乐 API
-- [CustomTkinter](https://github.com/TomSchimansky/CustomTkinter) - 现代化的 Tkinter UI 库
-- 封面来源：Pixiv [@すいそう](https://www.pixiv.net/users/...) (作品 PID: 137922433)
-
-***
-
-## 📮 联系方式
-
-- 开发者：@墨白星耀
-- 问题反馈：[Issues](https://github.com/yourusername/MoMusic/issues)
 
 ***
 
