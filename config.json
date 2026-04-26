@@ -1,0 +1,10 @@
+{
+  "api_url": "http://localhost:3000",
+  "file_name_format": "song-artist",
+  "current_user_file": null,
+  "auto_close_download_window": false,
+  "auto_start_api": false,
+  "auto_close_api": true,
+  "api_path": "api-enhanced-main",
+  "download_dir": "downloads"
+}
