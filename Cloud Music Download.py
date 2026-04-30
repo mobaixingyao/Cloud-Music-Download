@@ -1914,11 +1914,21 @@ def get_app_dir():
         return os.path.dirname(os.path.abspath(__file__))
 
 def main():
+    try:
+        from ctypes import windll
+        windll.shell32.SetCurrentProcessExplicitAppUserModelID("CloudMusicDownload.1.0.0")
+    except:
+        pass
+    
     root = ctk.CTk()
     
     icon_path = os.path.join(get_app_dir(), "icon.ico")
     if os.path.exists(icon_path):
         root.iconbitmap(icon_path)
+        try:
+            root.iconbitmap(default=icon_path)
+        except:
+            pass
     
     app = MusicDownloaderApp(root)
     root.mainloop()
