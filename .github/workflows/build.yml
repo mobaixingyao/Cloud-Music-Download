@@ -12,27 +12,34 @@ on:
         default: 'false'
         type: boolean
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   build:
     name: Build on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os: [windows-latest, macos-latest, ubuntu-latest]
         include:
           - os: windows-latest
             platform: windows
-            executable: Cloud Music Download.exe
           - os: macos-latest
             platform: macos
-            executable: Cloud Music Download.app
           - os: ubuntu-latest
             platform: linux
-            executable: Cloud Music Download
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+
+    - name: Install system dependencies (Linux)
+      if: matrix.platform == 'linux'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y python3-tk tk-dev
 
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -46,38 +53,27 @@ jobs:
         pip install pyinstaller
         pip install -r requirements.txt
 
-    - name: Build executable (Windows)
+    - name: Build executable
+      run: |
+        pyinstaller --clean "Cloud Music Download.spec"
+
+    - name: Prepare artifacts (Windows)
       if: matrix.platform == 'windows'
       run: |
-        pyinstaller --clean "Cloud Music Download.spec"
-        mv dist/"Cloud Music Download.exe" .
+        cd dist
+        7z a -tzip "../Cloud-Music-Download-${{ matrix.platform }}.zip" "Cloud Music Download.exe" ../README.md ../config.json ../icon.ico
 
-    - name: Build executable (macOS)
+    - name: Prepare artifacts (macOS)
       if: matrix.platform == 'macos'
       run: |
-        pyinstaller --clean "Cloud Music Download.spec"
-        mv dist/"Cloud Music Download" .
+        cd dist
+        zip -r "../Cloud-Music-Download-${{ matrix.platform }}.zip" "Cloud Music Download" ../README.md ../config.json ../icon.ico
 
-    - name: Build executable (Linux)
+    - name: Prepare artifacts (Linux)
       if: matrix.platform == 'linux'
       run: |
-        pyinstaller --clean "Cloud Music Download.spec"
-        mv dist/"Cloud Music Download" .
-
-    - name: Create archive (Windows)
-      if: matrix.platform == 'windows'
-      run: |
-        7z a -tzip "Cloud-Music-Download-${{ matrix.platform }}.zip" "Cloud Music Download.exe" README.md config.json icon.ico
-
-    - name: Create archive (macOS)
-      if: matrix.platform == 'macos'
-      run: |
-        zip -r "Cloud-Music-Download-${{ matrix.platform }}.zip" "Cloud Music Download" README.md config.json icon.ico
-
-    - name: Create archive (Linux)
-      if: matrix.platform == 'linux'
-      run: |
-        tar -czf "Cloud-Music-Download-${{ matrix.platform }}.tar.gz" "Cloud Music Download" README.md config.json icon.ico
+        cd dist
+        tar -czf "../Cloud-Music-Download-${{ matrix.platform }}.tar.gz" "Cloud Music Download" ../README.md ../config.json ../icon.ico
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
@@ -87,6 +83,7 @@ jobs:
           Cloud-Music-Download-${{ matrix.platform }}.zip
           Cloud-Music-Download-${{ matrix.platform }}.tar.gz
         retention-days: 30
+        if-no-files-found: warn
 
   release:
     name: Create Release
