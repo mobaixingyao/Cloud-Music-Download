@@ -1,0 +1,67 @@
+name: Build Cloud Music Download
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          pip install customtkinter requests pillow pyinstaller
+      - name: Build with PyInstaller
+        run: |
+          pyinstaller --onefile --windowed --name "CloudMusicDownload" "Cloud Music Download.py"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CloudMusicDownload-Windows
+          path: dist/CloudMusicDownload.exe
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          pip install customtkinter requests pillow pyinstaller
+      - name: Build with PyInstaller
+        run: |
+          pyinstaller --onefile --windowed --name "CloudMusicDownload" "Cloud Music Download.py"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CloudMusicDownload-macOS
+          path: dist/CloudMusicDownload
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-tk libxkbcommon-x11-0
+      - name: Install Python dependencies
+        run: |
+          pip install customtkinter requests pillow pyinstaller
+      - name: Build with PyInstaller
+        run: |
+          pyinstaller --onefile --windowed --name "CloudMusicDownload" "Cloud Music Download.py"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CloudMusicDownload-Linux
+          path: dist/CloudMusicDownload
