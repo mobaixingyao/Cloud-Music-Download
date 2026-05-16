@@ -111,19 +111,24 @@ jobs:
       #     APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
   # ========== Linux 构建 + DEB 打包 ==========
+    # ========== Linux 构建 + DEB 打包 ==========
   build-linux:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      
       - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y python3-tk libxkbcommon-x11-0 dpkg-dev
+      
       - name: Install Python dependencies
         run: pip install customtkinter requests pillow pyinstaller
+      
       - name: Build with PyInstaller
         run: |
           pyinstaller --onefile --windowed \
@@ -172,11 +177,8 @@ jobs:
           Depends: python3, libxkbcommon-x11-0
           EOF
           
-          # 构建 .deb 包
-          dpkg-deb --build $PKG_DIR
-          
-          # 重命名包
-          mv $PKG_DIR.deb cloudmusicdownload_1.0.0_amd64.deb
+          # 构建 .deb 包（直接指定输出文件名，避免 mv）
+          dpkg-deb --build $PKG_DIR cloudmusicdownload_1.0.0_amd64.deb
       
       - name: Upload DEB artifact
         uses: actions/upload-artifact@v4
