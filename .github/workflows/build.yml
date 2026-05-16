@@ -8,24 +8,16 @@ on:
   workflow_dispatch:
 
 jobs:
+  # ========== Windows 构建 ==========
   build-windows:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      
       - name: Install dependencies
-        run: |
-          pip install customtkinter requests pillow pyinstaller
-      
-      - name: Verify icon files exist
-        run: |
-          if (Test-Path "icon.ico") { Write-Host "icon.ico found" } else { Write-Host "Warning: icon.ico not found" }
-          if (Test-Path "icon.png") { Write-Host "icon.png found" } else { Write-Host "Warning: icon.png not found" }
-      
+        run: pip install customtkinter requests pillow pyinstaller
       - name: Build with PyInstaller
         run: |
           pyinstaller --onefile --windowed `
@@ -33,88 +25,161 @@ jobs:
             --icon="icon.ico" `
             --add-data "icon.ico;." `
             --add-data "icon.png;." `
-            --add-data "icon.ico;." `
-            --add-binary "icon.ico;." `
             "Cloud Music Download.py"
-      
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
           name: CloudMusicDownload-Windows
           path: dist/CloudMusicDownload.exe
-          if-no-files-found: error
 
+  # ========== macOS 构建 + DMG 打包 ==========
   build-macos:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      
       - name: Install dependencies
         run: |
-          pip install customtkinter requests pillow pyinstaller
-      
-      - name: Verify icon files exist
+          pip install customtkinter requests pillow pyinstaller dmgbuild
+      - name: Build .app bundle with PyInstaller
         run: |
-          if [ -f "icon.icns" ]; then echo "icon.icns found"; else echo "Warning: icon.icns not found"; fi
-          if [ -f "icon.png" ]; then echo "icon.png found"; else echo "Warning: icon.png not found"; fi
-          if [ -f "icon.ico" ]; then echo "icon.ico found"; else echo "Warning: icon.ico not found"; fi
-      
-      - name: Build with PyInstaller
-        run: |
-          pyinstaller --onefile --windowed \
+          pyinstaller --windowed \
             --name "CloudMusicDownload" \
             --icon="icon.icns" \
             --add-data "icon.icns:." \
             --add-data "icon.png:." \
             "Cloud Music Download.py"
-      
-      - name: Upload macOS artifact
+      - name: Create DMG
+        run: |
+          # 创建 dmgbuild 配置文件
+          cat > dmg_settings.py << 'EOF'
+          import os
+          
+          volume_name = "CloudMusicDownload"
+          
+          application = define_applications_folder = False
+          
+          app_folder = "dist/CloudMusicDownload.app"
+          
+          format = "UDZO"
+          
+          window_rect = ((100, 100), (500, 400))
+          
+          icon_locations = {
+              "CloudMusicDownload.app": (140, 120),
+              "Applications": (360, 120)
+          }
+          
+          show_status_bar = False
+          show_tab_view = False
+          show_toolbar = False
+          show_pathbar = False
+          show_sidebar = False
+          sidebar_width = 180
+          
+          default_view = "icon-view"
+          
+          icon_size = 80
+          
+          files = [app_folder]
+          
+          symbolic_links = {"Applications": "/Applications"}
+          EOF
+          
+          # 创建 DMG
+          dmgbuild -s dmg_settings.py "CloudMusicDownload" CloudMusicDownload.dmg
+      - name: Upload DMG artifact
         uses: actions/upload-artifact@v4
         with:
-          name: CloudMusicDownload-macOS
-          path: dist/CloudMusicDownload
-          if-no-files-found: error
+          name: CloudMusicDownload-macOS-DMG
+          path: CloudMusicDownload.dmg
+      
+      # 可选：签名和公证（需要 Apple Developer 证书）
+      # - name: Sign and notarize DMG
+      #   run: |
+      #     # 需要配置 GitHub Secrets
+      #     xcrun notarytool submit CloudMusicDownload.dmg \
+      #       --apple-id "${{ secrets.APPLE_ID }}" \
+      #       --password "${{ secrets.APPLE_ID_PASSWORD }}" \
+      #       --team-id "${{ secrets.APPLE_TEAM_ID }}" --wait
+      #     xcrun stapler staple CloudMusicDownload.dmg
+      #   env:
+      #     APPLE_ID: ${{ secrets.APPLE_ID }}
+      #     APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+      #     APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
+  # ========== Linux 构建 + DEB 打包 ==========
   build-linux:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y python3-tk libxkbcommon-x11-0
-      
+          sudo apt-get install -y python3-tk libxkbcommon-x11-0 dpkg-dev
       - name: Install Python dependencies
-        run: |
-          pip install customtkinter requests pillow pyinstaller
-      
-      - name: Verify icon files exist
-        run: |
-          if [ -f "icon.ico" ]; then echo "icon.ico found"; else echo "Warning: icon.ico not found"; fi
-          if [ -f "icon.png" ]; then echo "icon.png found"; else echo "Warning: icon.png not found"; fi
-          if [ -f "icon.icns" ]; then echo "icon.icns found"; else echo "Warning: icon.icns not found"; fi
-      
+        run: pip install customtkinter requests pillow pyinstaller
       - name: Build with PyInstaller
         run: |
           pyinstaller --onefile --windowed \
-            --name "CloudMusicDownload" \
-            --icon="icon.ico" \
+            --name "cloudmusicdownload" \
             --add-data "icon.png:." \
             --add-data "icon.ico:." \
             "Cloud Music Download.py"
       
-      - name: Upload Linux artifact
+      - name: Create DEB package structure
+        run: |
+          # 创建 DEB 包目录结构
+          PKG_DIR="cloudmusicdownload_1.0.0_amd64"
+          mkdir -p $PKG_DIR/DEBIAN
+          mkdir -p $PKG_DIR/usr/local/bin
+          mkdir -p $PKG_DIR/usr/share/applications
+          mkdir -p $PKG_DIR/usr/share/icons/hicolor/256x256/apps
+          
+          # 复制可执行文件
+          cp dist/cloudmusicdownload $PKG_DIR/usr/local/bin/
+          
+          # 复制图标
+          cp icon.png $PKG_DIR/usr/share/icons/hicolor/256x256/apps/cloudmusicdownload.png
+          
+          # 创建 .desktop 文件
+          cat > $PKG_DIR/usr/share/applications/cloudmusicdownload.desktop << 'EOF'
+          [Desktop Entry]
+          Name=Cloud Music Download
+          Comment=网易云音乐下载工具
+          Exec=/usr/local/bin/cloudmusicdownload
+          Icon=cloudmusicdownload
+          Terminal=false
+          Type=Application
+          Categories=AudioVideo;Network;
+          EOF
+          
+          # 创建 control 文件
+          cat > $PKG_DIR/DEBIAN/control << 'EOF'
+          Package: cloudmusicdownload
+          Version: 1.0.0
+          Section: sound
+          Priority: optional
+          Architecture: amd64
+          Maintainer: Your Name <your@email.com>
+          Description: NetEase Cloud Music Download Tool
+           A GUI tool to download music from NetEase Cloud Music.
+          Depends: python3, libxkbcommon-x11-0
+          EOF
+          
+          # 构建 .deb 包
+          dpkg-deb --build $PKG_DIR
+          
+          # 重命名包
+          mv $PKG_DIR.deb cloudmusicdownload_1.0.0_amd64.deb
+      
+      - name: Upload DEB artifact
         uses: actions/upload-artifact@v4
         with:
-          name: CloudMusicDownload-Linux
-          path: dist/CloudMusicDownload
-          if-no-files-found: error
+          name: CloudMusicDownload-Linux-DEB
+          path: cloudmusicdownload_*.deb
