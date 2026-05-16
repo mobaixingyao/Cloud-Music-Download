@@ -1913,8 +1913,28 @@ def get_app_dir():
     else:
         return os.path.dirname(os.path.abspath(__file__))
 
+def set_ctk_icon(window, icon_path):
+    """为 customtkinter 窗口设置图标"""
+    if not os.path.exists(icon_path):
+        return False
+    
+    try:
+        from PIL import Image, ImageTk
+        
+        img = Image.open(icon_path)
+        photo = ImageTk.PhotoImage(img)
+        
+        window.tk.call('wm', 'iconphoto', window._w, photo)
+        window.tk.call('wm', 'iconphoto', window._w, '-default', photo)
+        
+        window._icon_photo = photo
+        
+        return True
+    except Exception as e:
+        print(f"图标设置失败: {e}")
+        return False
+
 def main():
-    # 1. 设置 Windows 任务栏应用ID（必须在窗口创建前）
     if os.name == 'nt':
         try:
             from ctypes import windll
@@ -1925,32 +1945,13 @@ def main():
     root = ctk.CTk()
     root.title("Cloud Music Download V1.0.0")
 
-    # 2. 设置图标（要求 icon.ico 在程序目录下）
     icon_path = os.path.join(get_app_dir(), "icon.ico")
-    if os.path.exists(icon_path):
-        # 方法一：传统 iconbitmap
-        try:
-            root.iconbitmap(icon_path)
-            root.iconbitmap(default=icon_path)
-        except Exception as e:
-            print(f"iconbitmap 设置失败: {e}")
-
-        # 方法二：iconphoto + 底层 Tk 命令（关键！）
-        try:
-            from PIL import Image, ImageTk
-            icon_img = ImageTk.PhotoImage(Image.open(icon_path))
-            # 设置为窗口图标
-            root.iconphoto(True, icon_img)
-            # 强制设置为默认图标（确保任务栏生效）
-            root.tk.call('wm', 'iconphoto', root._w, '-default', icon_img)
-            # 保持引用，防止被垃圾回收
-            root.icon_image = icon_img
-        except Exception as e:
-            print(f"iconphoto 设置失败: {e}")
-
-    # 3. 强制刷新窗口，让图标立即生效
-    root.update_idletasks()
-    root.update()
+    set_ctk_icon(root, icon_path)
+    
+    try:
+        root.iconbitmap(default=icon_path)
+    except:
+        pass
 
     app = MusicDownloaderApp(root)
     root.mainloop()
