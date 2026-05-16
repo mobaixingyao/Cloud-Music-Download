@@ -36,14 +36,175 @@ jobs:
           python-version: '3.11'
       - name: Install dependencies
         run: pip install -r requirements.txt
-      - name: Build with PyInstaller using spec
-        run: pyinstaller "Cloud Music Download.spec"
-      - name: Upload macOS artifact
+      - name: Build .app bundle with PyInstaller
+        run: |
+          pyinstaller --windowed \
+            --name "CloudMusicDownload" \
+            --icon="icon.icns" \
+            --add-data "icon.icns:." \
+            --add-data "icon.png:." \
+            --add-data "icon.ico:." \
+            --hidden-import "PIL._tkinter_finder" \
+            "Cloud Music Download.py"
+      - name: Create DMG for easy distribution
+        run: |
+          # 创建漂亮的 DMG 文件，用户拖拽即可安装
+          mkdir -p dmg_temp
+          cp -r "dist/CloudMusicDownload.app" dmg_temp/
+          ln -s /Applications dmg_temp/Applications
+          hdiutil create -volname "CloudMusicDownload" \
+            -srcfolder dmg_temp \
+            -ov -format UDZO \
+            CloudMusicDownload.dmg
+      - name: Upload macOS DMG artifact
         uses: actions/upload-artifact@v4
         with:
           name: CloudMusicDownload-macOS
-          path: dist/cloudmusicdownload
+          path: CloudMusicDownload.dmg
 
+  build-linux-appimage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-tk libxkbcommon-x11-0 \
+            libfuse2 wget file
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+      - name: Build with PyInstaller
+        run: |
+          pyinstaller --onefile --windowed \
+            --name "cloudmusicdownload" \
+            --add-data "icon.png:." \
+            --add-data "icon.ico:." \
+            --add-data "icon.icns:." \
+            --hidden-import "PIL._tkinter_finder" \
+            "Cloud Music Download.py"
+      - name: Download linuxdeploy
+        run: |
+          wget https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          chmod +x linuxdeploy-x86_64.AppImage
+      - name: Create AppDir structure
+        run: |
+          mkdir -p AppDir/usr/bin
+          mkdir -p AppDir/usr/share/applications
+          mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
+          
+          cp dist/cloudmusicdownload AppDir/usr/bin/
+          cp icon.png AppDir/usr/share/icons/hicolor/256x256/apps/cloudmusicdownload.png
+          
+          cat > AppDir/usr/share/applications/cloudmusicdownload.desktop << 'EOF'
+          [Desktop Entry]
+          Name=Cloud Music Download
+          Comment=网易云音乐下载工具
+          Exec=cloudmusicdownload
+          Icon=cloudmusicdownload
+          Terminal=false
+          Type=Application
+          Categories=AudioVideo;Network;
+          EOF
+          
+          cat > AppDir/AppRun << 'EOF'
+          #!/bin/bash
+          SELF=$(readlink -f "$0")
+          HERE=${SELF%/*}
+          export PATH="${HERE}/usr/bin/:${PATH}"
+          export LD_LIBRARY_PATH="${HERE}/usr/lib/:${LD_LIBRARY_PATH}"
+          exec "${HERE}/usr/bin/cloudmusicdownload" "$@"
+          EOF
+          chmod +x AppDir/AppRun
+      - name: Build AppImage
+        run: |
+          ./linuxdeploy-x86_64.AppImage --appdir AppDir \
+            --output appimage \
+            --desktop-file AppDir/usr/share/applications/cloudmusicdownload.desktop \
+            --icon-file AppDir/usr/share/icons/hicolor/256x256/apps/cloudmusicdownload.png
+      - name: Upload AppImage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CloudMusicDownload-Linux-AppImage
+          path: CloudMusicDownload-*.AppImage
+
+name: Build Cloud Music Download
+
+on:
+  push:
+    branches: [ main, master ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  # Windows - 直接生成 exe
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Build with PyInstaller
+        run: |
+          pyinstaller --onefile --windowed `
+            --name "CloudMusicDownload" `
+            --icon="icon.ico" `
+            --add-data "icon.ico;." `
+            --add-data "icon.png;." `
+            --hidden-import "PIL._tkinter_finder" `
+            "Cloud Music Download.py"
+      - name: Upload Windows exe
+        uses: actions/upload-artifact@v4
+        with:
+          name: CloudMusicDownload-Windows
+          path: dist/CloudMusicDownload.exe
+
+  # macOS - 生成 DMG（用户拖拽安装）
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Build .app bundle
+        run: |
+          pyinstaller --windowed \
+            --name "CloudMusicDownload" \
+            --icon="icon.icns" \
+            --add-data "icon.icns:." \
+            --add-data "icon.png:." \
+            --hidden-import "PIL._tkinter_finder" \
+            "Cloud Music Download.py"
+      - name: Create DMG
+        run: |
+          # 创建漂亮的 DMG 安装包
+          mkdir -p dmg_temp
+          cp -r "dist/CloudMusicDownload.app" dmg_temp/
+          ln -s /Applications dmg_temp/Applications
+          
+          # 设置 DMG 背景和图标位置（可选）
+          hdiutil create -volname "CloudMusicDownload" \
+            -srcfolder dmg_temp \
+            -ov -format UDZO \
+            CloudMusicDownload.dmg
+      - name: Upload macOS DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: CloudMusicDownload-macOS
+          path: CloudMusicDownload.dmg
+
+  # Linux - 生成 AppImage（可直接双击运行）
   build-linux:
     runs-on: ubuntu-latest
     steps:
@@ -54,13 +215,58 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y python3-tk libxkbcommon-x11-0
+          sudo apt-get install -y python3-tk libxkbcommon-x11-0 \
+            libfuse2 wget file desktop-file-utils
       - name: Install Python dependencies
         run: pip install -r requirements.txt
-      - name: Build with PyInstaller using spec
-        run: pyinstaller "Cloud Music Download.spec"
-      - name: Upload Linux artifact
+      - name: Build with PyInstaller
+        run: |
+          pyinstaller --onefile --windowed \
+            --name "cloudmusicdownload" \
+            --add-data "icon.png:." \
+            --add-data "icon.ico:." \
+            --hidden-import "PIL._tkinter_finder" \
+            "Cloud Music Download.py"
+      - name: Download appimagetool
+        run: |
+          wget https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x appimagetool-x86_64.AppImage
+      - name: Create AppImage
+        run: |
+          # 创建 AppDir 结构
+          mkdir -p CloudMusicDownload.AppDir/usr/bin
+          mkdir -p CloudMusicDownload.AppDir/usr/share/applications
+          mkdir -p CloudMusicDownload.AppDir/usr/share/icons/hicolor/256x256/apps
+          
+          cp dist/cloudmusicdownload CloudMusicDownload.AppDir/usr/bin/
+          cp icon.png CloudMusicDownload.AppDir/usr/share/icons/hicolor/256x256/apps/cloudmusicdownload.png
+          
+          # 创建 desktop 文件
+          cat > CloudMusicDownload.AppDir/cloudmusicdownload.desktop << 'EOF'
+          [Desktop Entry]
+          Name=Cloud Music Download
+          Comment=网易云音乐下载工具
+          Exec=cloudmusicdownload
+          Icon=cloudmusicdownload
+          Terminal=false
+          Type=Application
+          Categories=AudioVideo;Network;
+          EOF
+          
+          # 创建 AppRun
+          cat > CloudMusicDownload.AppDir/AppRun << 'EOF'
+          #!/bin/bash
+          HERE="$(dirname "$(readlink -f "$0")")"
+          export PATH="${HERE}/usr/bin/:${PATH}"
+          export LD_LIBRARY_PATH="${HERE}/usr/lib/:${LD_LIBRARY_PATH}"
+          exec "${HERE}/usr/bin/cloudmusicdownload" "$@"
+          EOF
+          chmod +x CloudMusicDownload.AppDir/AppRun
+          
+          # 打包成 AppImage
+          ARCH=x86_64 ./appimagetool-x86_64.AppImage CloudMusicDownload.AppDir
+      - name: Upload Linux AppImage
         uses: actions/upload-artifact@v4
         with:
           name: CloudMusicDownload-Linux
-          path: dist/cloudmusicdownload
+          path: CloudMusicDownload-*.AppImage
