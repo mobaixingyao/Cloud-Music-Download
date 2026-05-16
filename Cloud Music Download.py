@@ -1906,16 +1906,43 @@ def start_api_server(api_path):
         print(f"启动API服务失败: {e}")
         return None
 
+def get_resource_path(relative_path):
+    """获取资源文件的绝对路径（兼容 PyInstaller 打包）"""
+    try:
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    
+    return os.path.join(base_path, relative_path)
+
 def get_app_dir():
-    """获取应用程序所在目录"""
+    """获取应用程序所在目录（兼容开发和打包环境）"""
     if getattr(sys, 'frozen', False):
         return os.path.dirname(sys.executable)
     else:
         return os.path.dirname(os.path.abspath(__file__))
 
+def get_icon_path():
+    """获取图标文件路径（兼容打包环境）"""
+    try:
+        if getattr(sys, 'frozen', False):
+            resource_path = get_resource_path("icon.ico")
+            if os.path.exists(resource_path):
+                return resource_path
+    except:
+        pass
+    
+    app_dir = get_app_dir()
+    icon_path = os.path.join(app_dir, "icon.ico")
+    if os.path.exists(icon_path):
+        return icon_path
+    
+    return icon_path
+
 def set_ctk_icon(window, icon_path):
     """为 customtkinter 窗口设置图标"""
     if not os.path.exists(icon_path):
+        print(f"图标文件不存在: {icon_path}")
         return False
     
     try:
@@ -1927,8 +1954,15 @@ def set_ctk_icon(window, icon_path):
         window.tk.call('wm', 'iconphoto', window._w, photo)
         window.tk.call('wm', 'iconphoto', window._w, '-default', photo)
         
+        try:
+            window.iconbitmap(icon_path)
+            window.iconbitmap(default=icon_path)
+        except:
+            pass
+        
         window._icon_photo = photo
         
+        print(f"图标设置成功: {icon_path}")
         return True
     except Exception as e:
         print(f"图标设置失败: {e}")
@@ -1945,7 +1979,10 @@ def main():
     root = ctk.CTk()
     root.title("Cloud Music Download V1.0.0")
 
-    icon_path = os.path.join(get_app_dir(), "icon.ico")
+    icon_path = get_icon_path()
+    print(f"图标路径: {icon_path}")
+    print(f"图标存在: {os.path.exists(icon_path)}")
+    
     set_ctk_icon(root, icon_path)
     
     try:
