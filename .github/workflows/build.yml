@@ -1,164 +1,120 @@
-name: Build Executables
+name: Build Cloud Music Download
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
   workflow_dispatch:
-    inputs:
-      create_release:
-        description: 'Create a release'
-        required: false
-        default: 'false'
-        type: boolean
-
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  build:
-    name: Build on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [windows-latest, macos-latest, ubuntu-latest]
-        include:
-          - os: windows-latest
-            platform: windows
-          - os: macos-latest
-            platform: macos
-          - os: ubuntu-latest
-            platform: linux
-
+  build-windows:
+    runs-on: windows-latest
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install customtkinter requests pillow pyinstaller
+      
+      - name: Verify icon files exist
+        run: |
+          if (Test-Path "icon.ico") { Write-Host "icon.ico found" } else { Write-Host "Warning: icon.ico not found" }
+          if (Test-Path "icon.png") { Write-Host "icon.png found" } else { Write-Host "Warning: icon.png not found" }
+      
+      - name: Build with PyInstaller
+        run: |
+          pyinstaller --onefile --windowed `
+            --name "CloudMusicDownload" `
+            --icon="icon.ico" `
+            --add-data "icon.ico;." `
+            --add-data "icon.png;." `
+            --add-data "icon.ico;." `
+            --add-binary "icon.ico;." `
+            "Cloud Music Download.py"
+      
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CloudMusicDownload-Windows
+          path: dist/CloudMusicDownload.exe
+          if-no-files-found: error
 
-    - name: Install system dependencies (Linux)
-      if: matrix.platform == 'linux'
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y python3-tk tk-dev
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install customtkinter requests pillow pyinstaller
+      
+      - name: Verify icon files exist
+        run: |
+          if [ -f "icon.icns" ]; then echo "icon.icns found"; else echo "Warning: icon.icns not found"; fi
+          if [ -f "icon.png" ]; then echo "icon.png found"; else echo "Warning: icon.png not found"; fi
+          if [ -f "icon.ico" ]; then echo "icon.ico found"; else echo "Warning: icon.ico not found"; fi
+      
+      - name: Build with PyInstaller
+        run: |
+          pyinstaller --onefile --windowed \
+            --name "CloudMusicDownload" \
+            --icon="icon.icns" \
+            --add-data "icon.icns:." \
+            --add-data "icon.png:." \
+            "Cloud Music Download.py"
+      
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CloudMusicDownload-macOS
+          path: dist/CloudMusicDownload
+          if-no-files-found: error
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.10'
-        cache: 'pip'
-
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install pyinstaller
-        pip install -r requirements.txt
-
-    - name: Build executable
-      run: |
-        pyinstaller --clean "Cloud Music Download.spec"
-
-    - name: Prepare artifacts (Windows)
-      if: matrix.platform == 'windows'
-      run: |
-        cd dist
-        7z a -tzip "../Cloud-Music-Download-${{ matrix.platform }}.zip" "Cloud Music Download.exe" ../README.md ../config.json ../icon.ico
-
-    - name: Prepare artifacts (macOS)
-      if: matrix.platform == 'macos'
-      run: |
-        cd dist
-        zip -r "../Cloud-Music-Download-${{ matrix.platform }}.zip" "Cloud Music Download" ../README.md ../config.json ../icon.ico
-
-    - name: Prepare artifacts (Linux)
-      if: matrix.platform == 'linux'
-      run: |
-        cd dist
-        tar -czf "../Cloud-Music-Download-${{ matrix.platform }}.tar.gz" "Cloud Music Download" ../README.md ../config.json ../icon.ico
-
-    - name: Upload artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: ${{ matrix.platform }}-build
-        path: |
-          Cloud-Music-Download-${{ matrix.platform }}.zip
-          Cloud-Music-Download-${{ matrix.platform }}.tar.gz
-        retention-days: 30
-        if-no-files-found: warn
-
-  release:
-    name: Create Release
-    needs: build
+  build-linux:
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.create_release == 'true'
-    
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Download Windows artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: windows-build
-        path: ./artifacts
-
-    - name: Download macOS artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: macos-build
-        path: ./artifacts
-
-    - name: Download Linux artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: linux-build
-        path: ./artifacts
-
-    - name: Get version
-      id: get_version
-      run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
-
-    - name: Create Release
-      uses: softprops/action-gh-release@v1
-      with:
-        tag_name: ${{ steps.get_version.outputs.VERSION }}
-        name: Cloud Music Download ${{ steps.get_version.outputs.VERSION }}
-        files: |
-          artifacts/Cloud-Music-Download-windows.zip
-          artifacts/Cloud-Music-Download-macos.zip
-          artifacts/Cloud-Music-Download-linux.tar.gz
-        body: |
-          # 🎵 Cloud Music Download ${{ steps.get_version.outputs.VERSION }}
-          
-          ## 📥 下载说明
-          
-          ### Windows 用户
-          1. 下载 `Cloud-Music-Download-windows.zip`
-          2. 解压文件
-          3. 运行 `Cloud Music Download.exe`
-          
-          ### macOS 用户
-          1. 下载 `Cloud-Music-Download-macos.zip`
-          2. 解压文件
-          3. 运行 `Cloud Music Download`
-          4. 如果提示"无法打开"，请在终端运行：`xattr -cr "Cloud Music Download"`
-          
-          ### Linux 用户
-          1. 下载 `Cloud-Music-Download-linux.tar.gz`
-          2. 解压文件：`tar -xzf Cloud-Music-Download-linux.tar.gz`
-          3. 添加执行权限：`chmod +x "Cloud Music Download"`
-          4. 运行：`./Cloud Music Download`
-          
-          ## ⚙️ 环境要求
-          
-          - **本地 API**: 需要 Node.js 14 或更高版本
-          - **云端 API**: 无需额外依赖
-          
-          ## 📖 使用文档
-          
-          详细使用说明请查看 [README.md](https://github.com/mobaixingyao/Cloud-Music-Download#readme)
-          
-          ## 🙏 致谢
-          
-          感谢所有贡献者和用户的支持！
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-tk libxkbcommon-x11-0
+      
+      - name: Install Python dependencies
+        run: |
+          pip install customtkinter requests pillow pyinstaller
+      
+      - name: Verify icon files exist
+        run: |
+          if [ -f "icon.ico" ]; then echo "icon.ico found"; else echo "Warning: icon.ico not found"; fi
+          if [ -f "icon.png" ]; then echo "icon.png found"; else echo "Warning: icon.png not found"; fi
+          if [ -f "icon.icns" ]; then echo "icon.icns found"; else echo "Warning: icon.icns not found"; fi
+      
+      - name: Build with PyInstaller
+        run: |
+          pyinstaller --onefile --windowed \
+            --name "CloudMusicDownload" \
+            --icon="icon.ico" \
+            --add-data "icon.png:." \
+            --add-data "icon.ico:." \
+            "Cloud Music Download.py"
+      
+      - name: Upload Linux artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CloudMusicDownload-Linux
+          path: dist/CloudMusicDownload
+          if-no-files-found: error
